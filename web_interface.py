@@ -32,7 +32,7 @@ WEBHOOK_URL = "https://63e5-96-78-229-125.ngrok-free.app/webhook"
 
 class ConversationSimulator:
     def __init__(self, prompt, phone_number):
-        self.agent = TestAgent(prompt)
+        self.agent = TestAgent(agent_name=prompt, socketio=socketio, phone_number=phone_number)
         self.phone_number = phone_number
         self.epoch = 0
         self.is_running = False

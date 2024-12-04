@@ -12,6 +12,8 @@ class TestAgent:
     Maintains a static dependency graph across all instances of the same agent type.
     """
     agent_name: str
+    socketio: any
+    phone_number: str
     # Static dictionary to store dependency graphs for all agent types
     _dependency_graphs = defaultdict(dict)
     def __post_init__(self):
@@ -22,7 +24,7 @@ class TestAgent:
 
     def digest_text(self, text: str):
         """Digest text and learn more conversation paths."""
-        from web_interface import socketio
+     
         currentGraph = TestAgent._dependency_graphs[self.agent_name]
         
         # Get all existing paths at the start
@@ -180,7 +182,7 @@ response_type: <Your output here that matches the format of response_type>'''
             print("TRYInG to EMIT!!!!!!")
             print(f"Emitting data: {{'agent_name': self.agent_name, 'graph': self._dependency_graphs}}")
             try:
-                socketio.emit('update_graph', {'agent_name': self.agent_name, 'graph': self._dependency_graphs})
+                self.socketio.emit('update_graph', {'agent_name': self.agent_name, 'graph': self._dependency_graphs, 'phone_number': self.phone_number})
                 print("Emit successful")
             except Exception as e:
                 print(f"Error during emit: {e}")

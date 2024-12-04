@@ -19,6 +19,7 @@
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
     </style>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 
 <body class="min-h-screen p-8">
@@ -94,7 +95,118 @@
 
         function renderGraph(data) {
             console.log("Rendering graph with data:", data);
-            // Implement your graph rendering logic here
+
+            // Function to traverse the graph and collect nodes and links
+            function traverseGraph(graph, parentId = null) {
+                const nodes = [];
+                const links = [];
+
+                for (const [question, responses] of Object.entries(graph)) {
+                    const questionNode = { id: question };
+                    nodes.push(questionNode);
+
+                    if (parentId) {
+                        links.push({ source: parentId, target: question });
+                    }
+
+                    for (const [response, nextQuestions] of Object.entries(responses)) {
+                        const responseNode = { id: response };
+                        nodes.push(responseNode);
+                        links.push({ source: question, target: response });
+
+                        if (typeof nextQuestions === 'object' && nextQuestions !== null) {
+                            const { nodes: childNodes, links: childLinks } = traverseGraph(nextQuestions, response);
+                            nodes.push(...childNodes);
+                            links.push(...childLinks);
+                        }
+                    }
+                }
+
+                return { nodes, links };
+            }
+
+            // Traverse the graph to get nodes and links
+            const { nodes, links } = traverseGraph(data.graph);
+
+            // Select the SVG element where the graph will be rendered
+            const svg = d3.select(`#graph-${data.phone_number} svg`);
+            svg.selectAll("*").remove(); // Clear previous graph
+
+            const width = +svg.attr("width");
+            const height = +svg.attr("height");
+
+            // Create a simulation with forces
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-300))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            // Add links
+            const link = svg.append("g")
+                .attr("class", "links")
+                .selectAll("line")
+                .data(links)
+                .enter().append("line")
+                .attr("stroke-width", 2)
+                .attr("stroke", "#999");
+
+            // Add nodes
+            const node = svg.append("g")
+                .attr("class", "nodes")
+                .selectAll("circle")
+                .data(nodes)
+                .enter().append("circle")
+                .attr("r", 10)
+                .attr("fill", "#4CAF50")
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            // Add labels
+            const label = svg.append("g")
+                .attr("class", "labels")
+                .selectAll("text")
+                .data(nodes)
+                .enter().append("text")
+                .attr("dy", -3)
+                .attr("dx", 12)
+                .text(d => d.id);
+
+            // Update positions on each tick
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y);
+
+                label
+                    .attr("x", d => d.x)
+                    .attr("y", d => d.y);
+            });
+
+            // Drag functions
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
         }
 
         $(document).ready(function () {
