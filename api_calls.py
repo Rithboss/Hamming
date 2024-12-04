@@ -13,29 +13,41 @@ AUDIO_URL = "https://app.hamming.ai/api/media/exercise?id={id}"
 def startCall(phone_number: str, prompt: str, webhook_url: str = None):
     """
     Start a new call with the AI agent
-    
-    Args:
-        phone_number (str): The phone number to call
-        prompt (str): Instructions for the AI agent
-        webhook_url (str, optional): URL to receive call status updates
-    
-    Returns:
-        dict: Response containing call ID and status
     """
+    print(f"Making API call with phone: {phone_number}, prompt: {prompt}")
+    print(f"Using webhook URL: {webhook_url}")
+    
+    # Updated prompt to instruct the model to act as a client
+    updated_prompt = (
+        f"You are a client calling {prompt}. Use the scenario provided to simulate a conversation. "
+        f"Do not reveal that you are an AI. Use the context of {prompt} to guide the interaction."
+    )
+    
     payload = {
         "phone_number": phone_number,
-        "prompt": prompt
+        "prompt": updated_prompt,
+        "webhook_url": webhook_url
     }
     
-    if webhook_url:
-        payload["webhook_url"] = webhook_url
+    try:
+        response = requests.post(
+            CALL_URL, 
+            headers={"Authorization": f"Bearer {API_KEY}"}, 
+            json=payload
+        )
+        print(f"API Response: {response.text}")  # Print full response
         
-    response = requests.post(
-        CALL_URL, 
-        headers={"Authorization": f"Bearer {API_KEY}"}, 
-        json=payload
-    )
-    return response.json()
+        if response.status_code != 200:
+            print(f"Error: API returned status code {response.status_code}")
+            return None
+            
+        response_data = response.json()
+        print(f"Parsed response: {response_data}")
+        return response_data
+        
+    except Exception as e:
+        print(f"Error making API call: {str(e)}")
+        return None
 
 def getAudio(call_id: str):
     """
