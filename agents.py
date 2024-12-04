@@ -3,6 +3,8 @@ import llm
 from collections import defaultdict
 import json
 from llm import chat_with_gpt4
+
+
 @dataclass
 class TestAgent:
     """
@@ -20,6 +22,7 @@ class TestAgent:
 
     def digest_text(self, text: str):
         """Digest text and learn more conversation paths."""
+        from web_interface import socketio
         currentGraph = TestAgent._dependency_graphs[self.agent_name]
         
         # Get all existing paths at the start
@@ -174,9 +177,13 @@ response_type: <Your output here that matches the format of response_type>'''
                 break
             else:
                 previous_outputs.add(output_key)
-                # Set flag to indicate graph needs update
-                self.graph_needs_update = True
-                # Process the response as needed
+            print("TRYInG to EMIT!!!!!!")
+            print(f"Emitting data: {{'agent_name': self.agent_name, 'graph': self._dependency_graphs}}")
+            try:
+                socketio.emit('update_graph', {'agent_name': self.agent_name, 'graph': self._dependency_graphs})
+                print("Emit successful")
+            except Exception as e:
+                print(f"Error during emit: {e}")
 
     def discover_capabilities(self):
         """Generate new test prompts based on current dependency graph to discover more capabilities."""

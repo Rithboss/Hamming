@@ -65,59 +65,6 @@
                     <span class="epoch-counter text-sm text-gray-500">Epoch: 0</span>
                 </div>
                 <div class="space-y-4">
-                    <div class="flex items-center">
-                        <div
-                            class="flex items-center justify-center w-8 h-8 rounded-full border-2 call-state-indicator">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
-                            </svg>
-                        </div>
-                        <div class="ml-3 flex-1">
-                            <div class="call-state text-sm font-medium">Call Status: Initializing...</div>
-                            <div class="text-xs text-gray-500 call-state-details"></div>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center">
-                        <div
-                            class="flex items-center justify-center w-8 h-8 rounded-full border-2 recording-state-indicator">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="3" />
-                            </svg>
-                        </div>
-                        <div class="ml-3 flex-1">
-                            <div class="recording-state text-sm font-medium">Recording: Waiting...</div>
-                            <div class="text-xs text-gray-500 recording-state-details"></div>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center">
-                        <div
-                            class="flex items-center justify-center w-8 h-8 rounded-full border-2 transcription-state-indicator">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                        </div>
-                        <div class="ml-3 flex-1">
-                            <div class="transcription-state text-sm font-medium">Transcription: Pending...</div>
-                            <div class="text-xs text-gray-500 transcription-state-details"></div>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center">
-                        <div
-                            class="flex items-center justify-center w-8 h-8 rounded-full border-2 analysis-state-indicator">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                        </div>
-                        <div class="ml-3 flex-1">
-                            <div class="analysis-state text-sm font-medium">Analysis: Pending...</div>
-                            <div class="text-xs text-gray-500 analysis-state-details"></div>
-                        </div>
-                    </div>
                 </div>
                 <div class="mt-4">
                     <div id="graph-{phone_number}" class="graph-container">
@@ -127,227 +74,27 @@
             </div>
         </template>
 
-        <div class="graph-container">
-            <h3>Conversation Graph</h3>
-            <div id="graph-visualization"></div>
-        </div>
+
 
     </div>
 
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script>
-        function updateGraph(phoneNumber) {
-            $.get(`/graph/${phoneNumber}`, function (data) {
-                if (data.status === 'success') {
-                    visualizeGraph(data.graph, `graph-${phoneNumber}`);
-                    // Update epoch counter if needed
-                    const graphContainer = $(`#graph-${phoneNumber}`);
-                    if (data.epoch) {
-                        graphContainer.find('.epoch-counter').text(`Epoch: ${data.epoch}`);
-                    }
-                }
-            }).fail(function (error) {
-                console.error("Error fetching graph:", error);
-            });
-        }
+        const socket = io('http://127.0.0.1:8000');
 
-        function visualizeGraph(graphData, containerId) {
-            console.log("Visualizing graph for:", containerId, graphData);
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
 
-            // Escape special characters in the container ID
-            const escapedContainerId = containerId.replace(/[+]/g, '\\$&');
-            const container = document.getElementById(containerId);
-            if (!container) {
-                console.error("Container not found:", containerId);
-                return;
-            }
+        socket.on('update_graph', function (data) {
+            console.log('Graph update received:', data);
+            // Update the graph with the new data
+            renderGraph(data);
+        });
 
-            // Clear previous visualization
-            container.innerHTML = '';
-
-            // Initialize D3 visualization
-            const width = 800;
-            const height = 400;
-            const margin = { top: 20, right: 120, bottom: 20, left: 120 };
-
-            const svg = d3.select(`#${escapedContainerId}`)
-                .append('svg')
-                .attr('width', width)
-                .attr('height', height)
-                .append('g')
-                .attr('transform', `translate(${margin.left},${margin.top})`);
-
-            if (!graphData.nodes || graphData.nodes.length === 0) {
-                svg.append('text')
-                    .attr('x', (width - margin.left - margin.right) / 2)
-                    .attr('y', (height - margin.top - margin.bottom) / 2)
-                    .attr('text-anchor', 'middle')
-                    .text('Building conversation graph...');
-                return;
-            }
-
-            // Create the force simulation
-            const simulation = d3.forceSimulation(graphData.nodes.map(id => ({ id })))
-                .force('link', d3.forceLink(graphData.edges.map(([source, target]) => ({ source, target })))
-                    .id(d => d.id))
-                .force('charge', d3.forceManyBody().strength(-300))
-                .force('center', d3.forceCenter((width - margin.left - margin.right) / 2,
-                    (height - margin.top - margin.bottom) / 2));
-
-            // Add the links
-            const links = svg.append('g')
-                .selectAll('line')
-                .data(graphData.edges)
-                .enter()
-                .append('line')
-                .attr('class', 'link')
-                .style('stroke', '#999')
-                .style('stroke-width', 1);
-
-            // Add the nodes
-            const nodes = svg.append('g')
-                .selectAll('g')
-                .data(graphData.nodes)
-                .enter()
-                .append('g')
-                .attr('class', 'node')
-                .call(d3.drag()
-                    .on('start', dragstarted)
-                    .on('drag', dragged)
-                    .on('end', dragended));
-
-            nodes.append('circle')
-                .attr('r', 5)
-                .style('fill', '#69b3a2');
-
-            nodes.append('text')
-                .attr('dx', 12)
-                .attr('dy', '.35em')
-                .text(d => d);
-
-            // Update positions on each tick
-            simulation.on('tick', () => {
-                links
-                    .attr('x1', d => d.source.x)
-                    .attr('y1', d => d.source.y)
-                    .attr('x2', d => d.target.x)
-                    .attr('y2', d => d.target.y);
-
-                nodes
-                    .attr('transform', d => `translate(${d.x},${d.y})`);
-            });
-
-            // Drag functions
-            function dragstarted(event) {
-                if (!event.active) simulation.alphaTarget(0.3).restart();
-                event.subject.fx = event.subject.x;
-                event.subject.fy = event.subject.y;
-            }
-
-            function dragged(event) {
-                event.subject.fx = event.x;
-                event.subject.fy = event.y;
-            }
-
-            function dragended(event) {
-                if (!event.active) simulation.alphaTarget(0);
-                event.subject.fx = null;
-                event.subject.fy = null;
-            }
-        }
-
-        // Function to update specific status elements
-        function updateStatus(phoneNumber, message) {
-            console.log(`Updating status for ${phoneNumber}: ${message}`);
-            const card = $(`#simulation-${phoneNumber}`);
-            if (!card.length) {
-                console.error(`Card not found for ${phoneNumber}`);
-                return;
-            }
-
-            function updateIndicator(type, status, details = '') {
-                const indicator = card.find(`.${type}-state-indicator`);
-                const stateText = card.find(`.${type}-state`);
-                const stateDetails = card.find(`.${type}-state-details`);
-
-                indicator.removeClass('active completed error');
-                indicator.addClass(status);
-
-                if (stateText.length) stateText.text(message);
-                if (stateDetails.length && details) stateDetails.text(details);
-            }
-
-            // Map backend status to frontend indicators
-            if (message.includes('Call connected')) {
-                updateIndicator('call-state', 'active', 'Call in progress...');
-            } else if (message.includes('Call ended')) {
-                updateIndicator('call-state', 'completed');
-                updateIndicator('recording-state', 'active', 'Waiting for recording...');
-            } else if (message.includes('Recording in progress')) {
-                updateIndicator('recording-state', 'active', 'Recording conversation...');
-            } else if (message.includes('Processing recording')) {
-                updateIndicator('recording-state', 'completed');
-                updateIndicator('transcription-state', 'active', 'Processing audio...');
-            } else if (message.includes('Analyzing')) {
-                updateIndicator('transcription-state', 'completed');
-                updateIndicator('analysis-state', 'active', 'Analyzing conversation...');
-            } else if (message === 'Completed') {
-                updateIndicator('analysis-state', 'completed');
-            }
-        }
-
-        // Add event source for status updates with reconnection logic
-        function listenForUpdates(phoneNumber) {
-            console.log("Starting to listen for updates for phone number:", phoneNumber);
-            setInterval(function () {
-                $.get(`/graph_status/${phoneNumber}`, function (response) {
-                    console.log("Graph status response:", response);
-                    if (response.status === 'success' && response.needs_update) {
-                        updateGraphUI(phoneNumber);
-                    }
-                }).fail(function (error) {
-                    console.error("Error fetching graph status:", error);
-                });
-            }, 3000);
-        }
-
-        // Remove any existing graph polling functions
-        // Add new function for graph updates based on webhook
-        function updateGraphFromWebhook(phoneNumber) {
-            console.log("Checking graph update from webhook for phone number:", phoneNumber);
-            $.get(`/graph_status/${phoneNumber}`, function (response) {
-                console.log("Webhook graph status response:", response);
-                if (response.status === 'success' && response.needs_update) {
-                    updateGraph(phoneNumber);
-                }
-            }).fail(function (error) {
-                console.error("Error fetching graph status from webhook:", error);
-            });
-        }
-
-        function stopSimulation(phoneNumber) {
-            $.get(`/stop_simulation/${phoneNumber}`, function (response) {
-                if (response.status === 'success') {
-                    $(`#simulation-${phoneNumber}`).remove();
-                }
-            });
-        }
-
-        // Add a function to update the UI when the graph is updated
-        function updateGraphUI(phoneNumber) {
-            console.log("Entering updateGraphUI for phone number:", phoneNumber);
-            $.get(`/graph/${phoneNumber}`, function (response) {
-                console.log("Graph response:", response);
-                if (response.status === 'success') {
-                    console.log("Graph data received:", response.graph);
-                    const graphData = response.graph;
-                    visualizeGraph(graphData, `graph-${phoneNumber}`);
-                } else {
-                    console.error("Failed to fetch graph data");
-                }
-            }).fail(function (error) {
-                console.error("Error fetching graph:", error);
-            });
+        function renderGraph(data) {
+            console.log("Rendering graph with data:", data);
+            // Implement your graph rendering logic here
         }
 
         $(document).ready(function () {
@@ -363,22 +110,14 @@
                 }, function (response) {
                     if (response.status === 'success') {
                         console.log('Simulation started successfully');
-
-                        // Clone the template and append it to the active simulations
-                        const template = $('#simulation-card-template').html();
-                        const newCard = $(template).clone();
-                        newCard.find('.call-state').text('Call Status: Initializing...');
-                        newCard.find('.epoch-counter').text('Epoch: 0');
-                        newCard.find('.graph-container').attr('id', `graph-${phoneNumber}`);
-                        $('#active-simulations').append(newCard);
-
-                        // Start listening for updates
-                        listenForUpdates(phoneNumber);
-                    } else {
-                        console.error('Failed to start simulation:', response.message);
+                        // Create a new simulation card
+                        const template = document.getElementById('simulation-card-template');
+                        const clone = template.content.cloneNode(true);
+                        clone.querySelector('.simulation-card').id = `simulation-${phoneNumber}`;
+                        clone.querySelector('.epoch-counter').textContent = 'Epoch: 0';
+                        clone.querySelector('.graph-container').id = `graph-${phoneNumber}`;
+                        $('#active-simulations').append(clone);
                     }
-                }).fail(function (error) {
-                    console.error('Error starting simulation:', error);
                 });
             });
         });

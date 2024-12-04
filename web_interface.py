@@ -1,5 +1,12 @@
-import llm
+import sys
+print(sys.executable)
+print(sys.path)
+from flask_socketio import SocketIO, emit
 from flask import Flask, render_template, jsonify, request, send_file
+app = Flask(__name__)
+socketio = SocketIO(app)
+import llm
+
 import networkx as nx
 import matplotlib
 matplotlib.use('Agg')
@@ -16,10 +23,11 @@ import os
 from transcribe import transcribe_audio_sync
 import asyncio
 
-app = Flask(__name__)
+
+
 
 # Add this near the top of the file, after the imports
-WEBHOOK_URL = "https://43d3-96-78-229-125.ngrok-free.app/webhook"
+WEBHOOK_URL = "https://63e5-96-78-229-125.ngrok-free.app/webhook"
 
 
 class ConversationSimulator:
@@ -30,7 +38,6 @@ class ConversationSimulator:
         self.is_running = False
         self.thread = None
         self.pending_recordings = {}
-        self.graph_needs_update = False
 
     def handle_webhook(self, data):
         """Handle webhook notifications from Hamming"""
@@ -96,7 +103,7 @@ class ConversationSimulator:
                 self.agent.digest_text(transcript)
                 
                 self.pending_recordings[call_id]['status'] = 'Completed'
-                self.graph_needs_update = True
+                
             else:
                 error_msg = f'Error downloading recording: {response.status_code}'
                 print(error_msg)
@@ -147,113 +154,7 @@ def stop_simulation(phone_number):
         del active_simulations[phone_number]
     return jsonify({'status': 'success'})
 
-@app.route('/get_graph/<phone_number>')
-def get_graph(phone_number):
-    if phone_number not in active_simulations:
-        return jsonify({'status': 'error', 'message': 'Simulation not found'})
-    
-    simulator = active_simulations[phone_number]
-    graph_data = TestAgent._dependency_graphs[simulator.agent.agent_name]
-    
-    # Convert the graph to a visualization
-    plt.figure(figsize=(12, 8))
-    G = nx.DiGraph()
-    
-    def add_nodes(graph, parent=None):
-        for question, responses in graph.items():
-            if isinstance(responses, dict):
-                G.add_node(question, type='question')
-                if parent:
-                    G.add_edge(parent, question)
-                for response, next_level in responses.items():
-                    response_node = f"{question}_{response}"
-                    G.add_node(response_node, type='response')
-                    G.add_edge(question, response_node)
-                    add_nodes(next_level, response_node)
 
-    add_nodes(graph_data.get('conversation_paths', {}))
-    
-    # Generate the plot
-    pos = nx.spring_layout(G)
-    nx.draw(G, pos, with_labels=True, node_color='lightblue', 
-            node_size=2000, font_size=8, font_weight='bold')
-    
-    # Convert plot to base64 string
-    img = io.BytesIO()
-    plt.savefig(img, format='png', bbox_inches='tight')
-    img.seek(0)
-    graph_url = base64.b64encode(img.getvalue()).decode()
-    plt.close()
-    
-    return jsonify({
-        'status': 'success',
-        'graph': graph_url,
-        'epoch': simulator.epoch
-    })
-
-@app.route('/status/<phone_number>')
-def status(phone_number):
-    if phone_number not in active_simulations:
-        return jsonify({'status': 'error', 'message': 'Simulation not found'}), 404
-        
-    simulator = active_simulations[phone_number]
-    latest_status = None
-    latest_time = None
-    
-    for call_id, status_data in simulator.pending_recordings.items():
-        if status_data['phone_number'] == phone_number:
-            if not latest_time or status_data.get('start_time', '') > latest_time:
-                latest_status = status_data['status']
-                latest_time = status_data.get('start_time')
-    
-    # Include graph_needs_update in status response
-    return jsonify({
-        'status': 'success',
-        'message': latest_status or 'No status available',
-        'graph_needs_update': simulator.graph_needs_update
-    })
-
-@app.route('/graph/<phone_number>')
-def graph(phone_number):
-    if phone_number not in active_simulations:
-        return jsonify({'status': 'error', 'message': 'Simulation not found'}), 404
-        
-    simulator = active_simulations[phone_number]
-    if not simulator.agent:
-        return jsonify({'status': 'error', 'message': 'No agent found'}), 404
-        
-    # Use a sample graph for testing
-    if phone_number == "+14153580761":
-        graph_data = {
-            'nodes': ['A', 'B', 'C'],
-            'edges': [('A', 'B'), ('B', 'C')]
-        }
-    else:
-        # Create a new directed graph
-        G = nx.DiGraph()
-        dep_graph = simulator.agent._dependency_graphs[simulator.agent.agent_name]
-        
-        def add_nodes_edges(graph, parent=None):
-            for q in graph:
-                G.add_node(q)
-                if parent:
-                    G.add_edge(parent, q)
-                for r in graph[q]:
-                    G.add_node(r)
-                    G.add_edge(q, r)
-                    add_nodes_edges(graph[q][r], r)
-        
-        add_nodes_edges(dep_graph)
-        
-        graph_data = {
-            'nodes': list(G.nodes()),
-            'edges': list(G.edges())
-        }
-    
-    return jsonify({
-        'status': 'success',
-        'graph': graph_data
-    })
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -267,9 +168,6 @@ def webhook():
             if call_id in simulator.pending_recordings:
                 print(f"Handling webhook for call_id: {call_id}, status: {status}")
                 simulator.handle_webhook(data)
-                if status == 'event_recording' and data.get('recording_available'):
-                    simulator.graph_needs_update = True
-                    print(f"Graph needs update set to True for phone number: {phone_number}")
                 return jsonify({'status': 'success'})
         
         print(f"No simulation found for call_id: {call_id}")
@@ -279,19 +177,13 @@ def webhook():
         print(f"Webhook error: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/graph_status/<phone_number>')
-def graph_status(phone_number):
-    if phone_number not in active_simulations:
-        return jsonify({'status': 'error', 'message': 'Simulation not found'}), 404
-        
-    simulator = active_simulations[phone_number]
-    needs_update = simulator.graph_needs_update
-    simulator.graph_needs_update = False  # Reset flag after checking
-    print(f"Graph status for phone number {phone_number}: needs_update = {needs_update}")
-    return jsonify({
-        'status': 'success',
-        'needs_update': needs_update
-    })
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8000) 
+    socketio.run(app, debug=True, port=8000)
