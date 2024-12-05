@@ -38,6 +38,8 @@ class ConversationSimulator:
         self.is_running = False
         self.thread = None
         self.pending_recordings = {}
+        self.currentContext = ""
+        self.currentGraph = {}
 
     def handle_webhook(self, data):
         """Handle webhook notifications from Hamming"""
@@ -184,6 +186,45 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     print('Client disconnected')
+
+@app.route('/discover_capabilities/<phone_number>', methods=['POST'])
+def discover_capabilities(phone_number):
+    if phone_number not in active_simulations:
+        return jsonify({'status': 'error', 'message': 'Simulation not found'})
+    print("hello")
+    simulator = active_simulations[phone_number]
+    current_graph = simulator.agent._dependency_graphs[simulator.agent.agent_name]
+    print("Starting SImulation")
+    # Create a new prompt for the next iteration
+    iteration_prompt = (
+        f"You are a customer calling about {simulator.agent.agent_name} services. "
+        f"Based on the current conversation history and capabilities, "
+        f"simulate a new scenario that explores different aspects of the service. "
+        f"Try to uncover new paths and capabilities not yet seen in the graph."
+    )
+   
+    # Start a new call with the current graph context
+    response = startCall(
+        phone_number=phone_number,
+        prompt=simulator.agent.agent_name,
+        webhook_url=WEBHOOK_URL,
+        context=iteration_prompt,
+        graph=current_graph
+    )
+    
+    if response and 'id' in response:
+        simulator.pending_recordings[response['id']] = {
+            'status': 'Starting new discovery call...',
+            'phone_number': phone_number,
+            'start_time': time.strftime('%Y-%m-%dT%H:%M:%S.%f%z')
+        }
+        simulator.epoch += 1  # Increment the epoch counter
+        socketio.emit('update_epoch', {
+            'phone_number': phone_number,
+            'epoch': simulator.epoch
+        })
+        return jsonify({'status': 'success'})
+    return jsonify({'status': 'error', 'message': 'Failed to start discovery call'})
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, port=8000)

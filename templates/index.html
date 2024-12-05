@@ -76,6 +76,13 @@
                     <h3 class="text-lg font-semibold">Capabilities:</h3>
                     <ul id="capabilities-list-{phone_number}" class="list-disc pl-5"></ul>
                 </div>
+                <div class="mt-4">
+                    <button
+                        class="discover-capabilities-btn bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                        data-phone="${phone_number}">
+                        Discover More Capabilities
+                    </button>
+                </div>
             </div>
         </template>
 
@@ -129,32 +136,42 @@
                 return { nodes, links };
             }
 
-            // Traverse the graph to get nodes and links
             const { nodes, links } = traverseGraph(data.graph);
-
-            // Select the SVG element where the graph will be rendered
             const svg = d3.select(`#graph-${data.phone_number} svg`);
-            svg.selectAll("*").remove(); // Clear previous graph
+            svg.selectAll("*").remove();
 
             const width = +svg.attr("width");
             const height = +svg.attr("height");
 
-            // Create a simulation with forces
+            // Add arrow marker definition
+            svg.append("defs").append("marker")
+                .attr("id", "arrowhead")
+                .attr("viewBox", "-0 -5 10 10")
+                .attr("refX", 20)
+                .attr("refY", 0)
+                .attr("orient", "auto")
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .append("path")
+                .attr("d", "M 0,-5 L 10,0 L 0,5")
+                .attr("fill", "#999");
+
             const simulation = d3.forceSimulation(nodes)
                 .force("link", d3.forceLink(links).id(d => d.id).distance(100))
                 .force("charge", d3.forceManyBody().strength(-300))
                 .force("center", d3.forceCenter(width / 2, height / 2));
 
-            // Add links
+            // Add links with arrows
             const link = svg.append("g")
                 .attr("class", "links")
                 .selectAll("line")
                 .data(links)
                 .enter().append("line")
                 .attr("stroke-width", 2)
-                .attr("stroke", "#999");
+                .attr("stroke", "#999")
+                .attr("marker-end", "url(#arrowhead)");
 
-            // Add nodes
+            // Rest of the function remains the same
             const node = svg.append("g")
                 .attr("class", "nodes")
                 .selectAll("circle")
@@ -167,7 +184,6 @@
                     .on("drag", dragged)
                     .on("end", dragended));
 
-            // Add labels
             const label = svg.append("g")
                 .attr("class", "labels")
                 .selectAll("text")
@@ -177,7 +193,6 @@
                 .attr("dx", 12)
                 .text(d => d.id);
 
-            // Update positions on each tick
             simulation.on("tick", () => {
                 link
                     .attr("x1", d => d.source.x)
@@ -194,7 +209,7 @@
                     .attr("y", d => d.y);
             });
 
-            // Drag functions
+            // Drag functions remain the same
             function dragstarted(event, d) {
                 if (!event.active) simulation.alphaTarget(0.3).restart();
                 d.fx = d.x;
@@ -243,13 +258,24 @@
                         if (capabilitiesList) {
                             capabilitiesList.id = `capabilities-list-${phoneNumber}`;
                         }
-
+                        clone.querySelector('.discover-capabilities-btn').setAttribute('data-phone', phoneNumber);
                         $('#active-simulations').append(clone);
                     } else {
                         console.error('Failed to start simulation:', response.message);
                     }
                 }).fail(function (jqXHR, textStatus, errorThrown) {
                     console.error('Error starting simulation:', textStatus, errorThrown);
+                });
+            });
+
+            $(document).on('click', '.discover-capabilities-btn', function () {
+                const phoneNumber = $(this).data('phone');
+                $.post(`/discover_capabilities/${phoneNumber}`, function (response) {
+                    if (response.status === 'success') {
+                        console.log('Started discovering new capabilities');
+                    } else {
+                        console.error('Failed to start discovery:', response.message);
+                    }
                 });
             });
         });
@@ -267,6 +293,13 @@
                 listItem.textContent = capability.substring(1);
                 capabilitiesList.appendChild(listItem);
             });
+        });
+
+        socket.on('update_epoch', function (data) {
+            const card = document.querySelector(`#simulation-${data.phone_number}`);
+            if (card) {
+                card.querySelector('.epoch-counter').textContent = `Epoch: ${data.epoch}`;
+            }
         });
     </script>
 
