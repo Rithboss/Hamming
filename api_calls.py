@@ -11,7 +11,7 @@ agents = {}
 CALL_URL = "https://app.hamming.ai/api/rest/exercise/start-call"
 AUDIO_URL = "https://app.hamming.ai/api/media/exercise?id={id}" 
 
-def startCall(phone_number: str, prompt: str, webhook_url: str = None, context: str = None, graph=None):
+def startCall(phone_number: str, prompt: str, webhook_url: str = None, context: [] = None, graph=None):
     """
     Start a new call with the AI agent
     
@@ -21,14 +21,18 @@ def startCall(phone_number: str, prompt: str, webhook_url: str = None, context: 
         webhook_url: URL for webhook notifications
         context: Additional context for the conversation
         graph: Current conversation graph structure
+        previous_call_context: Previous call context
     """
-    print(f"Making API call with phone: {phone_number}, prompt: {prompt}")
+    print(f"Making API call with phone: {phone_number}, prompt: {prompt}")  
     print(f"Using webhook URL: {webhook_url}")
     
     # Format the graph structure for the prompt
     graph_context = ""
     if graph:
         graph_context = "\nPrevious conversation paths:\n" + json.dumps(graph, indent=2)
+    
+    # Convert context list to string if it exists
+    context_str = "\n".join(context) if context else "Standard customer service call"
     
     # Updated prompt to instruct the model to act as a client
     updated_prompt = (
@@ -40,7 +44,7 @@ def startCall(phone_number: str, prompt: str, webhook_url: str = None, context: 
         f"4. If previous conversation paths exist, try to explore new scenarios\n"
         f"5. Respond to questions naturally and provide relevant information\n\n"
         f"Business Context: {prompt}\n"
-        f"Additional Context: {context if context else 'Standard customer service call'}"
+        f"Additional Context: {context_str}"
         f"{graph_context}"
     )
     

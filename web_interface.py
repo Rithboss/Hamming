@@ -24,7 +24,7 @@ from transcribe import transcribe_audio_sync
 import asyncio
 
 
-
+previous_call_context = []
 
 # Add this near the top of the file, after the imports
 WEBHOOK_URL = " https://f4f4-96-78-229-125.ngrok-free.app/webhook"
@@ -40,6 +40,7 @@ class ConversationSimulator:
         self.pending_recordings = {}
         self.currentContext = ""
         self.currentGraph = {}
+        
 
     def handle_webhook(self, data):
         """Handle webhook notifications from Hamming"""
@@ -100,7 +101,8 @@ class ConversationSimulator:
                 # Use Deepgram to transcribe the audio
                 transcript = asyncio.run(transcribe_audio_sync(response.content))
                 print(f"Transcript for {call_id}: {transcript}")
-                
+                previous_call_context.append(transcript)   
+            
                 # Call digest_text with the transcript
                 self.agent.digest_text(transcript)
                 
@@ -134,7 +136,7 @@ def start_simulation():
     print(f"Prompt: {prompt}")
     
     # Start the call with the webhook URL
-    response = startCall(phone_number, prompt, webhook_url=WEBHOOK_URL)
+    response = startCall(phone_number, prompt, webhook_url=WEBHOOK_URL, context= previous_call_context)
     
     if response and 'id' in response:
         if phone_number not in active_simulations:
@@ -200,16 +202,16 @@ def discover_capabilities(phone_number):
         f"You are a customer calling about {simulator.agent.agent_name} services. "
         f"Based on the current conversation history and capabilities, "
         f"simulate a new scenario that explores different aspects of the service. "
-        f"Try to uncover new paths and capabilities not yet seen in the graph."
+        f"Try to uncover new paths and capabilities not yet seen in the graph. "
+        f"Make sure the conversation is drastically different than the previous call and the context."
     )
    
     # Start a new call with the current graph context
     response = startCall(
         phone_number=phone_number,
-        prompt=simulator.agent.agent_name,
+        prompt= iteration_prompt,
         webhook_url=WEBHOOK_URL,
-        context=iteration_prompt,
-        graph=current_graph
+        context= previous_call_context,
     )
     
     if response and 'id' in response:
