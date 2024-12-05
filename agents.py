@@ -51,98 +51,98 @@ class TestAgent:
         while True:
             # Build prompt with exact format provided
             currentPrompt = f'''[TASK]
-"Your task is to analyze transcript segments from customer service interactions and identify both the current interaction type and the appropriate next step in the response pathway. Each segment includes the customer's request and the customer service representative's (CSR) reply. Utilizing the provided 'currentpath' and 'allpaths' data, determine the interaction type and then predict the next possible response categories from the paths available.
+            "Your task is to analyze transcript segments from customer service interactions and identify both the current interaction type and the appropriate next step in the response pathway. Each segment includes the customer's request and the customer service representative's (CSR) reply. Utilizing the provided 'currentpath' and 'allpaths' data, determine the interaction type and then predict the next possible response categories from the paths available.
 
-1. Review the dialogue snippet and understand the context of the interaction.
-2. Consider the 'currentpath', which indicates the current state of the conversation. 
-[VERY VERY VERY VERY VERY IMPORTANT]: If you see a similar categorizaiton, report the same one in the currentGraph.
-3. Examine 'allpaths', which lists all possible conversational paths and options.
-4. Identify the type of interaction from 'currentpath'.
-5. Determine the next response type by selecting an appropriate option from the linked list under the current interaction type in 'allpaths'.
-6. Format your response as follows:
-    - interaction_type: Type of the current interaction extracted from 'currentpath'.
-    - response_type: The anticipated next step in the conversation from 'allpaths'.
+            1. Review the dialogue snippet and understand the context of the interaction.
+            2. Consider the 'currentpath', which indicates the current state of the conversation. 
+            [VERY VERY VERY VERY VERY IMPORTANT]: If you see a similar categorizaiton, report the same one in the currentGraph.
+            3. Examine 'allpaths', which lists all possible conversational paths and options.
+            4. Identify the type of interaction from 'currentpath'.
+            5. Determine the next response type by selecting an appropriate option from the linked list under the current interaction type in 'allpaths'.
+            6. Format your response as follows:
+                - interaction_type: Type of the current interaction extracted from 'currentpath'.
+                - response_type: The anticipated next step in the conversation from 'allpaths'.
 
-Example analysis:
-- Input text: 'Customer: I need help resetting my password. \nCSR: Can you verify your email associated with the account?'
-  currentpath: 'PASSWORD_RESET', 
-  allpaths: {{'PASSWORD_RESET': ['EMAIL_VERIFICATION', 'SECURITY_QUESTION'], 'EMAIL_VERIFICATION': ['SEND_RESET_LINK', 'VERIFY_IDENTITY']}}
-- Output should be:
-  interaction_type: PASSWORD_RESET
-  response_type: EMAIL_VERIFICATION
+            Example analysis:
+            - Input text: 'Customer: I need help resetting my password. \nCSR: Can you verify your email associated with the account?'
+            currentpath: 'PASSWORD_RESET', 
+            allpaths: {{'PASSWORD_RESET': ['EMAIL_VERIFICATION', 'SECURITY_QUESTION'], 'EMAIL_VERIFICATION': ['SEND_RESET_LINK', 'VERIFY_IDENTITY']}}
+            - Output should be:
+            interaction_type: PASSWORD_RESET
+            response_type: EMAIL_VERIFICATION
 
-Remember, your response impacts the effectiveness and fluency of a conversational model in real-world customer service scenarios. Accurate and intuitive interaction categorization is crucial for seamless automation and enhanced customer experience."
----
+            Remember, your response impacts the effectiveness and fluency of a conversational model in real-world customer service scenarios. Accurate and intuitive interaction categorization is crucial for seamless automation and enhanced customer experience."
+            ---
 
-[FORMAT]
-Follow the following format:
+            [FORMAT]
+            Follow the following format:
 
-[INPUT]
-text: text of the customer service call transcript
-currentPath: {json.dumps(list(currentGraph.keys()), indent=2)}
-pastPaths: {json.dumps(self._dependency_graphs, indent=2)}
-[OUTPUT]
-interaction_type: broad category of the question type in the conversation
-response_type: broad category of the response type in the conversation
+            [INPUT]
+            text: text of the customer service call transcript
+            currentPath: {json.dumps(list(currentGraph.keys()), indent=2)}
+            pastPaths: {json.dumps(self._dependency_graphs, indent=2)}
+            [OUTPUT]
+            interaction_type: broad category of the question type in the conversation
+            response_type: broad category of the response type in the conversation
 
----
+            ---
 
-[EXAMPLES]
+            [EXAMPLES]
 
-[Example 1]
-[INPUT]
-text: Customer: I need to cancel my service. 
-CSR: Can you please provide your account number?
-currentPath: 
-allPaths: 
-[OUTPUT]
-interaction_type: CANCEL_SERVICE
-response_type: ACCOUNT_NUMBER
----
-[Example 2]
-[INPUT]
-text: Customer: Hi, I'm an existing customer. 
-CSR: How can I assist you today?
-currentPath: 
-allPaths: 
-[OUTPUT]
-interaction_type: EXISTING_CUSTOMER
-response_type: ACCOUNT_BALANCE
----
-[Example 3]
-[INPUT]
-text: Customer: I'd like to speak to a supervisor. 
-CSR: Let me go ahead and escalate that for you.
-currentPath: 
-allPaths: 
-[OUTPUT]
-interaction_type: ESCALATION_REQUEST
-response_type: SUPERVISOR_ASSISTANCE
----
-[Example 4]
-[INPUT]
-text: Customer: Hi, I'd like to open a new account. 
-CSR: What type of account would you like to open?
-currentPath: 
-allPaths: 
-[OUTPUT]
-interaction_type: NEW_CUSTOMER
-response_type: ACCOUNT_TYPE
----
+            [Example 1]
+            [INPUT]
+            text: Customer: I need to cancel my service. 
+            CSR: Can you please provide your account number?
+            currentPath: 
+            allPaths: 
+            [OUTPUT]
+            interaction_type: CANCEL_SERVICE
+            response_type: ACCOUNT_NUMBER
+            ---
+            [Example 2]
+            [INPUT]
+            text: Customer: Hi, I'm an existing customer. 
+            CSR: How can I assist you today?
+            currentPath: 
+            allPaths: 
+            [OUTPUT]
+            interaction_type: EXISTING_CUSTOMER
+            response_type: ACCOUNT_BALANCE
+            ---
+            [Example 3]
+            [INPUT]
+            text: Customer: I'd like to speak to a supervisor. 
+            CSR: Let me go ahead and escalate that for you.
+            currentPath: 
+            allPaths: 
+            [OUTPUT]
+            interaction_type: ESCALATION_REQUEST
+            response_type: SUPERVISOR_ASSISTANCE
+            ---
+            [Example 4]
+            [INPUT]
+            text: Customer: Hi, I'd like to open a new account. 
+            CSR: What type of account would you like to open?
+            currentPath: 
+            allPaths: 
+            [OUTPUT]
+            interaction_type: NEW_CUSTOMER
+            response_type: ACCOUNT_TYPE
+            ---
 
-For the given inputs, first generate your reasoning and then generate the outputs.
+            For the given inputs, first generate your reasoning and then generate the outputs.
 
-[INPUT]
-text: {text}
-nextSteps: {json.dumps(list(currentGraph.keys()), indent=2)}
-allPaths: {json.dumps(allPaths, indent=2)}
+            [INPUT]
+            text: {text}
+            nextSteps: {json.dumps(list(currentGraph.keys()), indent=2)}
+            allPaths: {json.dumps(allPaths, indent=2)}
 
-[REASONING]
-my_reasoning: <Your careful and step-by-step reasoning before you return the desired outputs for the given inputs>
+            [REASONING]
+            my_reasoning: <Your careful and step-by-step reasoning before you return the desired outputs for the given inputs>
 
-[OUTPUT]
-interaction_type: <Your output here that matches the format of interaction_type>
-response_type: <Your output here that matches the format of response_type>'''
+            [OUTPUT]
+            interaction_type: <Your output here that matches the format of interaction_type>
+            response_type: <Your output here that matches the format of response_type>'''
         
             # Get response from GPT
             response = chat_with_gpt4(currentPrompt)
