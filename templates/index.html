@@ -72,6 +72,10 @@
                         <svg width="800" height="400"></svg>
                     </div>
                 </div>
+                <div id="capabilities-{phone_number}" class="mt-4">
+                    <h3 class="text-lg font-semibold">Capabilities:</h3>
+                    <ul id="capabilities-list-{phone_number}" class="list-disc pl-5"></ul>
+                </div>
             </div>
         </template>
 
@@ -228,9 +232,40 @@
                         clone.querySelector('.simulation-card').id = `simulation-${phoneNumber}`;
                         clone.querySelector('.epoch-counter').textContent = 'Epoch: 0';
                         clone.querySelector('.graph-container').id = `graph-${phoneNumber}`;
+                        console.log("Checking capabilities div");
+                        const capabilitiesDiv = clone.querySelector('[id^="capabilities-"]');
+                        if (capabilitiesDiv) {
+                            capabilitiesDiv.id = `capabilities-${phoneNumber}`;
+                        }
+
+                        // Set the ID for the capabilities list
+                        const capabilitiesList = clone.querySelector('[id^="capabilities-list-"]');
+                        if (capabilitiesList) {
+                            capabilitiesList.id = `capabilities-list-${phoneNumber}`;
+                        }
+
                         $('#active-simulations').append(clone);
+                    } else {
+                        console.error('Failed to start simulation:', response.message);
                     }
+                }).fail(function (jqXHR, textStatus, errorThrown) {
+                    console.error('Error starting simulation:', textStatus, errorThrown);
                 });
+            });
+        });
+
+
+        socket.on('update_capabilities', function (data) {
+            console.log('Capabilities update received:', data);
+            const outerDiv = document.getElementById(`capabilities-${data.phone_number}`);
+
+            const capabilitiesList = outerDiv.querySelector(`#capabilities-list-${data.phone_number}`);
+            capabilitiesList.innerHTML = ''; // Clear existing list
+
+            data.capabilities.forEach(function (capability) {
+                const listItem = document.createElement('li');
+                listItem.textContent = capability.substring(1);
+                capabilitiesList.appendChild(listItem);
             });
         });
     </script>

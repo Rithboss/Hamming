@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import llm
 from collections import defaultdict
 import json
@@ -16,6 +16,7 @@ class TestAgent:
     phone_number: str
     # Static dictionary to store dependency graphs for all agent types
     _dependency_graphs = defaultdict(dict)
+    reasoning_log: list = field(default_factory=list)
     def __post_init__(self):
         # Initialize dependency graph for this agent type if it doesn't exist
         if self.agent_name not in TestAgent._dependency_graphs:
@@ -53,7 +54,8 @@ class TestAgent:
 "Your task is to analyze transcript segments from customer service interactions and identify both the current interaction type and the appropriate next step in the response pathway. Each segment includes the customer's request and the customer service representative's (CSR) reply. Utilizing the provided 'currentpath' and 'allpaths' data, determine the interaction type and then predict the next possible response categories from the paths available.
 
 1. Review the dialogue snippet and understand the context of the interaction.
-2. Consider the 'currentpath', which indicates the current state of the conversation. If you see a similar categorizaiton, report the same one in the currentGraph.
+2. Consider the 'currentpath', which indicates the current state of the conversation. 
+[VERY VERY VERY VERY VERY IMPORTANT]: If you see a similar categorizaiton, report the same one in the currentGraph.
 3. Examine 'allpaths', which lists all possible conversational paths and options.
 4. Identify the type of interaction from 'currentpath'.
 5. Determine the next response type by selecting an appropriate option from the linked list under the current interaction type in 'allpaths'.
@@ -78,7 +80,7 @@ Follow the following format:
 [INPUT]
 text: text of the customer service call transcript
 currentPath: {json.dumps(list(currentGraph.keys()), indent=2)}
-allPaths: {json.dumps(allPaths, indent=2)}
+pastPaths: {json.dumps(self._dependency_graphs, indent=2)}
 [OUTPUT]
 interaction_type: broad category of the question type in the conversation
 response_type: broad category of the response type in the conversation
@@ -164,6 +166,9 @@ response_type: <Your output here that matches the format of response_type>'''
                     raise ValueError("Could not parse interaction_type or response_type")
 
                 output_key = (interaction_type, response_type)
+                # Store reasoning in the log
+                reasoning = response.split("[REASONING]")[1].split("[OUTPUT]")[0].strip()
+                self.reasoning_log.append(reasoning)
             except Exception as e:
                 print(f"Error parsing response: {e}")
                 return  # or handle the error appropriately
@@ -176,6 +181,8 @@ response_type: <Your output here that matches the format of response_type>'''
             # Check for duplicate output
             if output_key in previous_outputs:
                 print("Duplicate output detected. Exiting.")
+                print(self.get_capabilities(self.agent_name))
+                print("Right before breaking")
                 break
             else:
                 previous_outputs.add(output_key)
@@ -187,6 +194,66 @@ response_type: <Your output here that matches the format of response_type>'''
             except Exception as e:
                 print(f"Error during emit: {e}")
 
+            # After getting the capabilities
+            capabilities = self.get_capabilities(self.agent_name)
+
+            # Emit capabilities to the frontend
+            self.socketio.emit('update_capabilities', {
+                'agent_name': self.agent_name,
+                'phone_number': self.phone_number,
+                'capabilities': capabilities
+            })
+    def get_capabilities(self, agent_name: str):
+        """Return a list of current capabilities based on the dependency graph."""
+        currentGraph = TestAgent._dependency_graphs[agent_name]
+
+        # Get all existing paths at the start
+        allPaths = {}
+        def build_paths_dict(graph, path=None):
+            if path is None:
+                path = []
+            result = {}
+            for q in graph:
+                for r in graph[q]:
+                    if q not in result:
+                        result[q] = []
+                    result[q].append(r)
+                    nested = build_paths_dict(graph[q][r], path + [q, r])
+                    result.update(nested)
+            return result
+        
+        allPaths = build_paths_dict(currentGraph)
+
+        # Include reasoning log in the prompt
+        
+        prompt = f'''Given the following conversation graph structure from a customer service AI agent, 
+        list out all the distinct capabilities this agent currently has in plain English as a list. 
+        For example: ["Can transfer to service associate", "Can report missing items", "Can call police", "Checks for existing membership"].
+
+        IMPORTANT: Do not return any JSON or graph structure. Only return a plain list of capabilities in English.
+
+        Graph structure (for analysis only, do not include in your response):
+        {json.dumps(currentGraph, indent=2)}
+
+        Paths available (for analysis only, do not include in your response):
+        {json.dumps(allPaths, indent=2)}
+
+        Previous analysis and reasoning (for context only, do not include in your response):
+        {self.reasoning_log}
+
+        Please analyze the graph and return a list of capabilities, one per line, in plain English.
+        Focus on what tasks and interactions the agent can handle based on the conversation paths shown.
+        Ensure the response is a simple list of capabilities, formatted as a Python list of strings, with each capability clearly described in plain English.
+        '''
+
+        # Get response from GPT
+        response = chat_with_gpt4(prompt)
+        print("This is the response:")
+        print(f"Response: {response}")
+        # Parse response into list of capabilities
+        capabilities = [cap.strip() for cap in response.split('\n') if cap.strip()]
+        
+        return capabilities
     def discover_capabilities(self):
         """Generate new test prompts based on current dependency graph to discover more capabilities."""
         currentGraph = TestAgent._dependency_graphs[self.agent_name]
@@ -235,10 +302,6 @@ response_type: <Your output here that matches the format of response_type>'''
         # Return only 3 scenarios
         return scenarios[:3]
 
-    @classmethod
-    def get_agent_capabilities(cls, agent_name: str):
-        """Get all discovered capabilities for a specific agent type."""
-        return cls._dependency_graphs.get(agent_name, {})
 
     @classmethod
     def get_all_agents(cls):
